@@ -42,23 +42,29 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/export.csv', async (req, res) => {
+  // Batasi ekspor supaya tidak OOM saat tabel audit membesar.
+  const MAX_EXPORT = 50000;
   let sql = 'SELECT * FROM audit_logs';
   const p = [];
   if (req.session.admin.role !== 'owner') {
     p.push(req.session.admin.id);
     sql += ` WHERE actor_id = $${p.length}`;
   }
-  sql += ' ORDER BY id DESC';
+  sql += ` ORDER BY id DESC LIMIT $${p.length + 1}`;
+  p.push(MAX_EXPORT);
 
   const r = await pool.query(sql, p);
   const cols = Object.keys(r.rows[0] || {});
-  const csv = [
-    cols.join(','),
-    ...r.rows.map(row => cols.map(c => JSON.stringify(row[c] ?? '')).join(','))
-  ].join('\n');
-  res.header('Content-Type', 'text/csv');
+  res.setHeader('Content-Type', 'text/csv');
   res.attachment('pall_audit.csv');
-  res.send(csv);
+  res.write('\uFEFF' + cols.join(',') + '\n'); // BOM agar Excel rapi
+  for (const row of r.rows) {
+    res.write(cols.map(c => JSON.stringify(row[c] ?? '')).join(',') + '\n');
+  }
+  if (r.rowCount >= MAX_EXPORT) {
+    res.write('# Ekspor dipotong pada ' + MAX_EXPORT + ' baris terakhir. Gunakan filter tanggal untuk hasil lengkap.\n');
+  }
+  res.end();
 });
 
 module.exports = router;

@@ -168,3 +168,15 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_pall_notify_admin_audit_event ON audit_logs;
 CREATE TRIGGER trg_pall_notify_admin_audit_event
 AFTER INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION pall_notify_admin_audit_event();
+
+-- Update sistem: token revocation list + indeks login_attempts (rate limiting)
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+  jti TEXT PRIMARY KEY,
+  user_id INT REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens (expires_at);
+DELETE FROM revoked_tokens WHERE expires_at < NOW();
+CREATE INDEX IF NOT EXISTS idx_login_attempts_username_time ON login_attempts (username, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time ON login_attempts (ip, created_at DESC);

@@ -1,5 +1,5 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { audit } = require('../lib/audit');
 const router = express.Router();
@@ -10,8 +10,8 @@ router.get('/', async (req, res) => {
   const currentPage = parseInt(page) || 1;
   const offset = (currentPage - 1) * limit;
 
-  let sql = 'SELECT * FROM users WHERE 1=1';
-  let countSql = 'SELECT COUNT(*) FROM users WHERE 1=1';
+  let sql = "SELECT * FROM users WHERE status <> 'deleted'";
+  let countSql = "SELECT COUNT(*) FROM users WHERE status <> 'deleted'";
   const p = [];
 
   // FILTER: Kalau bukan owner, cuma bisa liat user yang DIA buat
@@ -123,11 +123,12 @@ router.post('/:id/activate', async (req, res) => {
   res.redirect('/accounts');
 });
 
+// Soft delete: riwayat lisensi/perangkat & audit tetap utuh, akses langsung mati.
 router.post('/:id/delete', async (req, res) => {
   const user = await ownedUser(req.params.id, req.session.admin);
   if (!user) return denied(res);
-  await pool.query('DELETE FROM users WHERE id=$1', [user.id]);
-  await audit(req, 'account_delete', { targetType: 'user', targetId: user.id, note: `Akun ${user.username} dihapus` });
+  await pool.query("UPDATE users SET status='deleted' WHERE id=$1", [user.id]);
+  await audit(req, 'account_delete', { targetType: 'user', targetId: user.id, note: `Akun ${user.username} dihapus (soft-delete)` });
   res.redirect('/accounts');
 });
 

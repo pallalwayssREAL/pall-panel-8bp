@@ -64,11 +64,11 @@ router.get('/', async (req, res) => {
        ORDER BY l.id DESC LIMIT $${p.length + 1} OFFSET $${p.length + 2}`,
       [...p, limit, offset]
     );
-    let userSql = 'SELECT id, username FROM users';
+    let userSql = "SELECT id, username FROM users WHERE status <> 'deleted'";
     const userParams = [];
     if (req.session.admin.role !== 'owner') {
       userParams.push(req.session.admin.id);
-      userSql += ` WHERE created_by = $${userParams.length}`;
+      userSql += ` AND created_by = $${userParams.length}`;
     }
     userSql += ' ORDER BY username';
     const users = await pool.query(userSql, userParams);

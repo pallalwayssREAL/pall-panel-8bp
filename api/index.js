@@ -19,6 +19,8 @@ const settingsRouter = require('../routes/settings');
 const apiAppRouter   = require('../routes/api-app');
 const { requireRole } = require('../middleware/requireRole');
 const { securityHeaders, csrfProtection, csrfRender, notFound, errorHandler } = require('../middleware/security');
+const { maintenanceGate } = require('../lib/maintenance');
+const { createRateLimiter } = require('../lib/rateLimit');
 
 const app = express();
 if (!process.env.SESSION_SECRET && !process.env.JWT_SECRET) {
@@ -33,6 +35,8 @@ app.set('views', path.join(__dirname, '..', 'views'));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
+// Browser selalu minta /favicon.ico — sajikan logo supaya tidak 404.
+app.get('/favicon.ico', (req, res) => res.redirect('/logo.png'));
 
 app.use(session({
   store: new PgSession({ pool, tableName: 'session', createTableIfMissing: true }),
@@ -45,6 +49,12 @@ app.use(session({
 
 app.use(csrfRender);
 app.use(csrfProtection);
+
+// Rate-limit the admin panel login endpoint too (layered with DB login_attempts).
+app.post('/login', createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30 }));
+
+// Maintenance mode now covers the whole panel for non-owner admins.
+app.use(maintenanceGate);
 
 app.use('/', authRouter);
 app.use('/profile', requireRole('owner','admin'), profileRouter);
