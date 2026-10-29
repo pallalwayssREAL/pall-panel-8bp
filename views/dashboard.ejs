@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>PALL Panel</title><link rel="stylesheet" href="/style.css">
+<link rel="icon" type="image/png" href="/logo.png"></head>
+<body class="dashboard-page">
+<div class="pall-dashboard-shell">
+  <aside class="pall-sidebar">
+    <a class="pall-side-brand" href="/"><img class="brand-logo" src="/logo.png" alt="PALL logo"><span>PALL 8BP<small>PREMIUM CONTROL</small></span></a>
+    <div class="pall-side-section">MAIN MENU</div>
+    <nav class="pall-side-nav" aria-label="Navigasi utama">
+      <a class="is-current" href="/"><span class="pall-nav-icon">▦</span>Dashboard</a>
+      <% if (admin.role === 'owner') { %><a href="/admins"><span class="pall-nav-icon">♧</span>Akun Admin</a><% } %>
+      <a href="/accounts"><span class="pall-nav-icon">♙</span>Akun User</a>
+      <a href="/licenses"><span class="pall-nav-icon">◈</span>Lisensi</a>
+      <a href="/devices"><span class="pall-nav-icon">▣</span>Perangkat</a>
+      <a href="/audit"><span class="pall-nav-icon">⌁</span>Activity</a>
+      <% if (admin.role === 'owner') { %><a href="/settings"><span class="pall-nav-icon">⚙</span>Setelan</a><% } %>
+      <a href="/profile"><span class="pall-nav-icon">◎</span>Profil</a>
+    </nav>
+    <div class="pall-sidebar-bottom"><span class="pall-sidebar-status"><i></i> System Online</span><a href="/logout" class="pall-logout">⇥ &nbsp; Log Out</a></div>
+  </aside>
+  <div class="pall-dashboard-content">
+    <header class="pall-dashboard-header">
+      <div><span class="pall-header-kicker">PALL CONTROL CENTER</span><h1>Dashboard</h1></div>
+      <div class="pall-header-tools"><label class="pall-search"><span>⌕</span><input id="pall-dashboard-search" type="search" placeholder="Cari menu atau aktivitas..." aria-label="Cari menu atau aktivitas"></label><a class="pall-profile" href="/profile" title="Buka profil" style="text-decoration:none;color:inherit"><% if (admin.profile_image) { %><img class="pall-avatar" src="<%= admin.profile_image %>" alt="Foto profil" style="object-fit:cover"><% } else { %><span class="pall-avatar"><%= String((admin.display_name || admin.username || admin.usn || 'P').charAt(0)).toUpperCase() %></span><% } %><span><strong><%= admin.display_name || admin.username || admin.usn || 'Administrator' %></strong><small><%= String(admin.role || 'admin').toUpperCase() %></small></span></a></div>
+    </header>
+
+<% if (typeof pesan !== 'undefined' && pesan) { %>
+  <p class="ok" ><%= pesan %></p>
+<% } %>
+<% if (typeof error !== 'undefined' && error) { %>
+  <p class="err" ><%= error %></p>
+<% } %>
+
+<main class="dashboard-main">
+  <section class="dashboard-welcome">
+    <div class="welcome-copy">
+      <span class="eyebrow"><span class="live-dot"></span> SYSTEM OVERVIEW</span>
+      <h2>Selamat datang kembali!</h2>
+      <p>Ringkasan sistem dan aktivitas terbaru panel PALL 8BP.</p>
+    </div>
+    <div class="welcome-meta">
+      <% if (balance !== null) { %>
+        <span class="welcome-label">SALDO KREDIT</span>
+        <strong><%= balance.toLocaleString('id-ID') %> <small style="font-size:11px;opacity:.7;font-weight:600">kredit</small></strong>
+        <span class="role-chip">ADMIN</span>
+      <% } else { %>
+        <span class="welcome-label">HAK AKSES</span>
+        <strong>Seluruh sistem</strong>
+        <span class="role-chip">OWNER</span>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="dashboard-stats" aria-label="Ringkasan statistik">
+    <article class="stat-card stat-users">
+      <div class="stat-top"><span class="stat-icon">U</span><span class="stat-label">TOTAL AKUN USER</span></div>
+      <div class="stat-value"><%= stats.accounts %></div><div class="stat-foot">Akun terdaftar</div>
+    </article>
+    <article class="stat-card stat-active">
+      <div class="stat-top"><span class="stat-icon">✓</span><span class="stat-label">LISENSI AKTIF</span></div>
+      <div class="stat-value"><%= stats.lic_active %></div><div class="stat-foot">Siap digunakan</div>
+    </article>
+    <article class="stat-card stat-expired">
+      <div class="stat-top"><span class="stat-icon">!</span><span class="stat-label">LISENSI EXPIRED</span></div>
+      <div class="stat-value"><%= stats.lic_expired %></div><div class="stat-foot">Perlu ditinjau</div>
+    </article>
+    <article class="stat-card stat-android">
+      <div class="stat-top"><span class="stat-icon">A</span><span class="stat-label">PERANGKAT ANDROID</span></div>
+      <div class="stat-value"><%= stats.dev_android %></div><div class="stat-foot">Perangkat terdaftar</div>
+    </article>
+    <article class="stat-card stat-windows">
+      <div class="stat-top"><span class="stat-icon">W</span><span class="stat-label">PERANGKAT WINDOWS</span></div>
+      <div class="stat-value"><%= stats.dev_windows %></div><div class="stat-foot">Perangkat terdaftar</div>
+    </article>
+    <article class="stat-card stat-audit">
+      <div class="stat-top"><span class="stat-icon">≡</span><span class="stat-label">AUDIT LOG</span></div>
+      <div class="stat-value"><%= stats.logs %></div><div class="stat-foot">Catatan tersimpan</div>
+    </article>
+  </section>
+
+<%
+  const DAY_NAMES = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  const prepBars = (rows) => {
+    const list = Array.isArray(rows) ? rows : [];
+    const max = Math.max(1, ...list.map(r => r.total));
+    return list.map((r, i) => {
+      const d = new Date(r.day + 'T00:00:00Z');
+      return { total: r.total, pct: r.total ? Math.max(10, Math.round(r.total / max * 100)) : 0,
+               label: DAY_NAMES[d.getUTCDay()], date: d.getUTCDate(), today: i === list.length - 1 };
+    });
+  };
+  const charts = [
+    { key: 'lic', eyebrow: 'TREN 7 HARI', title: 'Lisensi Diterbitkan', note: 'lisensi', bars: prepBars(insights.licenseTrend) },
+    { key: 'act', eyebrow: 'TREN 7 HARI', title: 'Aktivitas Panel', note: 'aksi', bars: prepBars(insights.activityTrend) }
+  ];
+  const expiringList = insights.expiring || [];
+  const remaining = (value) => {
+    const ms = new Date(value).getTime() - Date.now();
+    if (Number.isNaN(ms) || ms <= 0) return { text: 'Berakhir', urgent: true };
+    const hours = Math.ceil(ms / 3600000);
+    if (hours < 24) return { text: hours + ' jam lagi', urgent: true };
+    const days = Math.ceil(ms / 86400000);
+    return { text: days + ' hari lagi', urgent: days <= 2 };
+  };
+%>
+  <section class="insight-grid" aria-label="Grafik 7 hari terakhir">
+    <% charts.forEach(c => { const sum = c.bars.reduce((a, b) => a + b.total, 0); %>
+    <article class="panel insight-card">
+      <div class="insight-head">
+        <div><span class="eyebrow"><%= c.eyebrow %></span><h2><%= c.title %></h2></div>
+        <div class="insight-total"><strong><%= sum %></strong><small><%= c.note %></small></div>
+      </div>
+      <% if (c.bars.length) { %>
+      <div class="bar-chart" role="img" aria-label="<%= c.title %> selama 7 hari terakhir, total <%= sum %>">
+        <% c.bars.forEach(b => { %>
+        <div class="bar-col<%= b.today ? ' is-today' : '' %>" title="<%= b.label %> <%= b.date %>: <%= b.total %> <%= c.note %>">
+          <span class="bar-val"><%= b.total %></span>
+          <span class="bar-track"><i class="bar-fill" style="height:<%= b.pct %>%"></i></span>
+          <span class="bar-day"><%= b.label %></span>
+        </div>
+        <% }) %>
+      </div>
+      <% } else { %>
+      <p class="insight-empty">Data grafik belum tersedia.</p>
+      <% } %>
+    </article>
+    <% }) %>
+  </section>
+
+  <section class="panel activity-panel expiring-panel">
+    <div class="activity-heading">
+      <div><span class="eyebrow">PERLU PERHATIAN</span><h2 style="margin:5px 0 0;">Lisensi Segera Berakhir</h2></div>
+      <a class="activity-link" href="/licenses">Kelola lisensi <span aria-hidden="true">→</span></a>
+    </div>
+    <% if (expiringList.length) { %>
+      <ul class="expiring-list">
+        <% expiringList.forEach(item => { const r = remaining(item.expires_at); %>
+        <li>
+          <span class="expiring-user"><%= item.username %></span>
+          <span class="expiring-when"><%= new Date(item.expires_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) %> WIB</span>
+          <span class="expiring-badge<%= r.urgent ? ' is-urgent' : '' %>"><%= r.text %></span>
+        </li>
+        <% }) %>
+      </ul>
+      <% if (insights.expiringTotal > expiringList.length) { %><p class="expiring-more">+<%= insights.expiringTotal - expiringList.length %> lisensi lain akan berakhir dalam 7 hari.</p><% } %>
+    <% } else { %>
+      <p>Tidak ada lisensi yang berakhir dalam 7 hari ke depan.</p>
+    <% } %>
+  </section>
+
+<section class="panel activity-panel">
+  <div class="activity-heading">
+    <div><span class="eyebrow">SYSTEM MONITOR</span><h2 style="margin:5px 0 0;">Aktivitas Terbaru</h2></div>
+    <a class="activity-link" href="/audit">Lihat semua <span aria-hidden="true">→</span></a>
+  </div>
+  <% if (recent && recent.length) { %>
+    <div class="activity-table-wrap">
+      <table class="activity-table">
+        <thead><tr><th>Aktivitas</th><th>Admin</th><th>Status</th><th>Waktu (WIB)</th></tr></thead>
+        <tbody>
+        <% recent.forEach(item => { %>
+          <tr>
+            <td><strong><%= String(item.action || 'aktivitas').replace(/_/g, ' ').toUpperCase() %></strong><% if (item.note) { %><div style="font-size:12px;opacity:.75;margin-top:4px;"><%= item.note %></div><% } %></td>
+            <td><%= item.actor_name || 'Sistem' %></td>
+            <td><span class="<%= item.result === 'success' ? 'status-active' : 'status-inactive' %>"><%= (item.result || 'info').toUpperCase() %></span></td>
+            <td><%= new Date(item.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <p style="margin-top:14px;opacity:.75;">Belum ada aktivitas yang tercatat.</p>
+  <% } %>
+</section>
+</main>
+  </div>
+</div>
+
+<script>
+(function(){
+  if (!document.getElementById('pall-video-background')) {
+    const video=document.createElement('video'); video.id='pall-video-background'; video.autoplay=true; video.muted=true; video.loop=true; video.playsInline=true; video.setAttribute('aria-hidden','true');
+    const source=document.createElement('source'); source.src='/pall-background.mp4'; source.type='video/mp4'; video.appendChild(source);
+    const overlay=document.createElement('div'); overlay.id='pall-video-overlay'; overlay.setAttribute('aria-hidden','true');
+    document.body.prepend(video); document.body.insertBefore(overlay, video.nextSibling);
+    const play=video.play(); if(play && play.catch) play.catch(()=>{});
+  }
+  // Low-volume background music. Browsers may require the first user interaction before audio can play.
+  if (!document.getElementById('pall-backsound')) {
+    const audio=document.createElement('audio'); audio.id='pall-backsound'; audio.loop=true; audio.preload='auto'; audio.volume=0.10;
+    const audioSource=document.createElement('source'); audioSource.src='/pall-backsound.mp3'; audioSource.type='audio/mpeg'; audio.appendChild(audioSource); document.body.appendChild(audio);
+    const startMusic=()=>{ audio.volume=0.10; const p=audio.play(); if(p && p.then) p.then(()=>{document.removeEventListener('pointerdown',startMusic);document.removeEventListener('keydown',startMusic);}).catch(()=>{}); };
+    startMusic(); document.addEventListener('pointerdown',startMusic); document.addEventListener('keydown',startMusic);
+  }
+  if (!document.getElementById('pall-cursor-glow') && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const cursor=document.createElement('div'); cursor.id='pall-cursor-glow'; cursor.setAttribute('aria-hidden','true'); document.body.appendChild(cursor);
+    let raf=0, x=0, y=0; document.addEventListener('mousemove',function(e){x=e.clientX;y=e.clientY;if(!raf)raf=requestAnimationFrame(function(){cursor.style.left=x+'px';cursor.style.top=y+'px';cursor.style.opacity='1';raf=0;});},{passive:true});
+    document.addEventListener('mouseleave',()=>cursor.style.opacity='0'); document.addEventListener('mouseenter',()=>cursor.style.opacity='1');
+    document.addEventListener('mousedown',()=>cursor.classList.add('is-active')); document.addEventListener('mouseup',()=>cursor.classList.remove('is-active'));
+  }
+})();
+</script>
+
+<script>
+(function(){
+  if (window.__pallPersistentAudioNav) return;
+  window.__pallPersistentAudioNav = true;
+  const persistentIds = ['pall-backsound','pall-video-background','pall-video-overlay','pall-cursor-glow'];
+  function shouldHandle(a, url) {
+    if (!a || !url || url.origin !== location.origin) return false;
+    if (a.target && a.target !== '_self') return false;
+    if (a.hasAttribute('download')) return false;
+    if (url.pathname === '/logout' || url.pathname === '/login' || url.pathname === '/account/password') return false;
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) return false;
+    return ['http:','https:'].includes(url.protocol);
+  }
+  async function navigate(url, push=true) {
+    document.documentElement.classList.add('pall-page-loading');
+    try {
+      const response = await fetch(url.href, { credentials:'same-origin', headers:{'X-PALL-NAV':'1'} });
+      if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) { location.href=url.href; return; }
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const persistent = new Map();
+      for (const id of persistentIds) { const node=document.getElementById(id); if(node) persistent.set(id,node); }
+      const incoming = Array.from(doc.body.childNodes);
+      // PJAX must sync body classes so page-specific styles follow the destination page.
+      document.body.className = doc.body.className;
+      for (const attr of Array.from(document.body.attributes)) { if (attr.name.startsWith("data-")) document.body.removeAttribute(attr.name); }
+      for (const attr of Array.from(doc.body.attributes)) { if (attr.name.startsWith("data-")) document.body.setAttribute(attr.name, attr.value); }
+      document.body.replaceChildren();
+      for (const node of incoming) {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SCRIPT') continue;
+        document.body.appendChild(document.importNode(node, true));
+      }
+      for (const node of persistent.values()) document.body.appendChild(node);
+      // Re-run page scripts so page-specific forms and controls keep working.
+      for (const oldScript of Array.from(doc.body.querySelectorAll('script'))) {
+        const s=document.createElement('script');
+        for (const attr of oldScript.attributes) s.setAttribute(attr.name, attr.value);
+        s.textContent=oldScript.textContent;
+        document.body.appendChild(s);
+      }
+      document.title = doc.title || 'PALL Panel';
+      if (push) history.pushState({pallNav:true}, '', url.href);
+      document.documentElement.classList.remove('pall-page-loading');
+      window.scrollTo(0,0);
+    } catch (e) { document.documentElement.classList.remove('pall-page-loading'); location.href=url.href; }
+  }
+  document.addEventListener('click', function(e){
+    if(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a=e.target.closest('a[href]'); if(!a) return;
+    let url; try { url=new URL(a.href, location.href); } catch(_){ return; }
+    if(!shouldHandle(a,url)) return;
+    e.preventDefault(); if(url.href !== location.href) navigate(url,true);
+  });
+  window.addEventListener('popstate', function(){ navigate(new URL(location.href),false); });
+})();
+</script>
+
+<script>
+(function(){
+ const search=document.getElementById('pall-dashboard-search');
+ if(!search)return;
+ search.addEventListener('input',function(){
+   const q=this.value.trim().toLocaleLowerCase('id');
+   document.querySelectorAll('.pall-side-nav a').forEach(a=>{a.style.display=!q||a.textContent.toLocaleLowerCase('id').includes(q)?'flex':'none';});
+   document.querySelectorAll('.activity-table tbody tr, .expiring-list li').forEach(tr=>{tr.style.display=!q||tr.textContent.toLocaleLowerCase('id').includes(q)?'':'none';});
+ });
+})();
+</script>
+<script src="/pall-enhancements.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Akun</title><link rel="stylesheet" href="/style.css">
+<link rel="icon" type="image/png" href="/logo.png"></head>
+<body class="pall-standard-page">
+<%- include('_sidebar') %>
+<div class="pall-standard-content">
+<div class="topbar">
+  <h1 class="brand-title"><img class="brand-logo" src="/logo.png" alt="PALL logo">ACCOUNT MANAGER</h1>
+  <nav>
+    <a href="/">DASHBOARD</a>
+    <% if (typeof admin !== 'undefined' && admin.role === 'owner') { %><a href="/admins">AKUN ADMIN</a><% } %>
+    <a href="/licenses">LISENSI</a>
+    <a href="/logout" class="btn danger" style="padding: 8px 16px;">LOGOUT</a>
+  </nav>
+</div>
+
+<div class="panel">
+  <h2>Buat User Baru</h2>
+  <form method="POST" action="/accounts/create" class="row">
+    <input name="username" placeholder="USERNAME" required style="flex: 1; min-width: 200px;">
+    <input name="password" placeholder="PASSWORD" required style="flex: 1; min-width: 200px;">
+    <input name="device_limit" type="number" value="1" min="1" placeholder="LIMIT" style="width:100px">
+    <button style="background: var(--green);">CREATE</button>
+  </form>
+</div>
+
+<div class="panel">
+  <form method="GET" action="/accounts" class="row">
+    <input name="q" placeholder="Cari username..." value="<%= q || '' %>" style="flex: 1;">
+    <select name="status" style="width: 200px;">
+      <option value="">Semua Status</option>
+      <option value="active" <%= status==='active'?'selected':'' %>>Aktif</option>
+      <option value="suspended" <%= status==='suspended'?'selected':'' %>>Suspended</option>
+    </select>
+    <button>CARI</button>
+  </form>
+  
+  <table class="responsive-table">
+    <thead><tr><th>ID</th><th>Username</th><th>Status</th><th>Limit</th><th>Aksi</th></tr></thead>
+    <tbody>
+    <% users.forEach(u => { %>
+    <tr>
+      <td data-label="ID"><%= u.id %></td>
+      <td data-label="Username" style="font-weight: 800; font-size: 18px;"><%= u.username %></td>
+      <td data-label="Status"><span class="<%= u.status === 'active' ? 'status-active' : 'status-inactive' %>"><%= u.status.toUpperCase() %></span></td>
+      <td data-label="Limit"><%= u.device_limit %></td>
+      <td data-label="Aksi" class="aksi">
+        <form method="POST" action="/accounts/<%= u.id %>/reset-password" class="inline">
+          <input name="password" placeholder="pw baru" required style="width: 120px; padding: 8px; border-width: 2px;">
+          <button style="padding: 8px 12px; border-width: 2px;">RESET</button>
+        </form>
+        <% if (u.status === 'active') { %>
+          <form method="POST" action="/accounts/<%= u.id %>/suspend" class="inline"><button style="padding: 8px 12px; border-width: 2px; background: var(--yellow);">SUSPEND</button></form>
+        <% } else { %>
+          <form method="POST" action="/accounts/<%= u.id %>/activate" class="inline"><button style="padding: 8px 12px; border-width: 2px; background: var(--green);">AKTIFKAN</button></form>
+        <% } %>
+        <form method="POST" action="/accounts/<%= u.id %>/delete" class="inline"><button class="danger" style="padding: 8px 12px; border-width: 2px;">HAPUS</button></form>
+      </td>
+    </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  
+  <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center; align-items: center;">
+    <% if (currentPage > 1) { %>
+      <a href="/accounts?page=<%= currentPage - 1 %>&q=<%= q || '' %>&status=<%= status || '' %>" class="btn" style="padding: 8px 16px;">&laquo; PREV</a>
+    <% } %>
+    <span class="page-indicator">Halaman <%= currentPage %> / <%= totalPages %></span>
+    <% if (currentPage < totalPages) { %>
+      <a href="/accounts?page=<%= currentPage + 1 %>&q=<%= q || '' %>&status=<%= status || '' %>" class="btn" style="padding: 8px 16px;">NEXT &raquo;</a>
+    <% } %>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('form[action*="/delete"], form[action*="/suspend"], form[action*="/reset-password"]').forEach(form => {
+    form.addEventListener('submit', event => {
+      const action = form.getAttribute('action') || '';
+      const message = action.includes('/delete') ? 'Hapus akun ini secara permanen?' : action.includes('/suspend') ? 'Suspend akun ini?' : 'Reset password akun ini?';
+      if (!window.confirm(message)) event.preventDefault();
+    });
+  });
+</script>
+
+<script>
+(function(){
+  if (!document.getElementById('pall-video-background')) {
+    const video=document.createElement('video'); video.id='pall-video-background'; video.autoplay=true; video.muted=true; video.loop=true; video.playsInline=true; video.setAttribute('aria-hidden','true');
+    const source=document.createElement('source'); source.src='/pall-background.mp4'; source.type='video/mp4'; video.appendChild(source);
+    const overlay=document.createElement('div'); overlay.id='pall-video-overlay'; overlay.setAttribute('aria-hidden','true');
+    document.body.prepend(video); document.body.insertBefore(overlay, video.nextSibling);
+    const play=video.play(); if(play && play.catch) play.catch(()=>{});
+  }
+  // Low-volume background music. Browsers may require the first user interaction before audio can play.
+  if (!document.getElementById('pall-backsound')) {
+    const audio=document.createElement('audio'); audio.id='pall-backsound'; audio.loop=true; audio.preload='auto'; audio.volume=0.10;
+    const audioSource=document.createElement('source'); audioSource.src='/pall-backsound.mp3'; audioSource.type='audio/mpeg'; audio.appendChild(audioSource); document.body.appendChild(audio);
+    const startMusic=()=>{ audio.volume=0.10; const p=audio.play(); if(p && p.then) p.then(()=>{document.removeEventListener('pointerdown',startMusic);document.removeEventListener('keydown',startMusic);}).catch(()=>{}); };
+    startMusic(); document.addEventListener('pointerdown',startMusic); document.addEventListener('keydown',startMusic);
+  }
+  if (!document.getElementById('pall-cursor-glow') && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const cursor=document.createElement('div'); cursor.id='pall-cursor-glow'; cursor.setAttribute('aria-hidden','true'); document.body.appendChild(cursor);
+    let raf=0, x=0, y=0; document.addEventListener('mousemove',function(e){x=e.clientX;y=e.clientY;if(!raf)raf=requestAnimationFrame(function(){cursor.style.left=x+'px';cursor.style.top=y+'px';cursor.style.opacity='1';raf=0;});},{passive:true});
+    document.addEventListener('mouseleave',()=>cursor.style.opacity='0'); document.addEventListener('mouseenter',()=>cursor.style.opacity='1');
+    document.addEventListener('mousedown',()=>cursor.classList.add('is-active')); document.addEventListener('mouseup',()=>cursor.classList.remove('is-active'));
+  }
+})();
+</script>
+
+<script>
+(function(){
+  if (window.__pallPersistentAudioNav) return;
+  window.__pallPersistentAudioNav = true;
+  const persistentIds = ['pall-backsound','pall-video-background','pall-video-overlay','pall-cursor-glow'];
+  function shouldHandle(a, url) {
+    if (!a || !url || url.origin !== location.origin) return false;
+    if (a.target && a.target !== '_self') return false;
+    if (a.hasAttribute('download')) return false;
+    if (url.pathname === '/logout' || url.pathname === '/login' || url.pathname === '/account/password') return false;
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) return false;
+    return ['http:','https:'].includes(url.protocol);
+  }
+  async function navigate(url, push=true) {
+    document.documentElement.classList.add('pall-page-loading');
+    try {
+      const response = await fetch(url.href, { credentials:'same-origin', headers:{'X-PALL-NAV':'1'} });
+      if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) { location.href=url.href; return; }
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const persistent = new Map();
+      for (const id of persistentIds) { const node=document.getElementById(id); if(node) persistent.set(id,node); }
+      const incoming = Array.from(doc.body.childNodes);
+      // PJAX must sync body classes so page-specific styles follow the destination page.
+      document.body.className = doc.body.className;
+      for (const attr of Array.from(document.body.attributes)) { if (attr.name.startsWith("data-")) document.body.removeAttribute(attr.name); }
+      for (const attr of Array.from(doc.body.attributes)) { if (attr.name.startsWith("data-")) document.body.setAttribute(attr.name, attr.value); }
+      document.body.replaceChildren();
+      for (const node of incoming) {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SCRIPT') continue;
+        document.body.appendChild(document.importNode(node, true));
+      }
+      for (const node of persistent.values()) document.body.appendChild(node);
+      // Re-run page scripts so page-specific forms and controls keep working.
+      for (const oldScript of Array.from(doc.body.querySelectorAll('script'))) {
+        const s=document.createElement('script');
+        for (const attr of oldScript.attributes) s.setAttribute(attr.name, attr.value);
+        s.textContent=oldScript.textContent;
+        document.body.appendChild(s);
+      }
+      document.title = doc.title || 'PALL Panel';
+      if (push) history.pushState({pallNav:true}, '', url.href);
+      document.documentElement.classList.remove('pall-page-loading');
+      window.scrollTo(0,0);
+    } catch (e) { document.documentElement.classList.remove('pall-page-loading'); location.href=url.href; }
+  }
+  document.addEventListener('click', function(e){
+    if(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a=e.target.closest('a[href]'); if(!a) return;
+    let url; try { url=new URL(a.href, location.href); } catch(_){ return; }
+    if(!shouldHandle(a,url)) return;
+    e.preventDefault(); if(url.href !== location.href) navigate(url,true);
+  });
+  window.addEventListener('popstate', function(){ navigate(new URL(location.href),false); });
+})();
+</script>
+
+<script src="/pall-enhancements.js" defer></script>
+</div>
+</body>
+</html>

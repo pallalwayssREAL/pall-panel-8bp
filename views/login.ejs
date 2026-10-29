@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PALL Panel Login</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" type="image/png" href="/logo.png">
+<style>
+  body.center { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+</style>
+</head>
+<body class="center">
+  <div class="panel" style="width:400px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="text-align:center; width:100%;"><img class="login-brand-logo" src="/logo.png" alt="PALL 8BP Logo"><h1 style="margin-bottom: 0;">PALL 8BP</h1></div>
+    </div>
+    <p style="text-align:center; font-weight: 700; margin-top: 10px; margin-bottom: 20px;">[ SYSTEM ACCESS ]</p>
+    
+    <% if (typeof error !== 'undefined' && error) { %>
+      <p class="err" style="text-align:center; background: var(--red); border: 3px solid var(--black); padding: 8px; font-weight: bold; color: #fff;"><%= error %></p>
+    <% } %>
+    
+    <% if (!show_pin) { %>
+      <form method="POST" action="/login">
+        <input name="username" placeholder="USERNAME" required style="width:100%">
+        <input name="password" type="password" placeholder="PASSWORD" required style="width:100%">
+        <button style="width:100%; margin-top: 12px; background: var(--green);">LOGIN</button>
+      </form>
+    
+    <% } else { %>
+      <p class="welcome-greeting">Halo, <span class="welcome-username"><%= username %></span></p>
+      <p style="text-align: center; margin-bottom: 16px;">Masukkan Security PIN lu.</p>
+      <form method="POST" action="/login" id="pinVerifyForm">
+        <input type="hidden" name="username" value="<%= username %>">
+        <input id="securityPinInput" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="one-time-code" placeholder="SECURITY PIN" required style="width:100%; text-align: center; letter-spacing: 4px; font-size: 24px;">
+        <button id="pinVerifyButton" type="submit" style="width:100%; margin-top: 12px;">VERIFIKASI</button>
+        <div id="pinLoading" class="pin-loading" role="status" aria-live="polite" aria-hidden="true">
+          <div class="pin-loading-track"><div id="pinLoadingBar" class="pin-loading-bar"></div></div>
+          <p id="pinLoadingLabel" class="pin-loading-label">MEMVERIFIKASI PIN...</p>
+        </div>
+      </form>
+      <div style="text-align: center; margin-top: 12px;">
+        <a href="/login" style="font-size: 14px;">&larr; Batal</a>
+      </div>
+    <% } %>
+  </div>
+
+
+<style>
+  .pin-loading { display:none; margin-top:16px; padding:12px; border:1px solid #604481; border-radius:10px; background:#171020; }
+  .pin-loading.is-visible { display:block; animation:pinFadeIn .2s ease-out both; }
+  .pin-loading-track { width:100%; height:4px; overflow:hidden; border-radius:999px; background:#38234f; box-shadow:inset 0 0 0 1px #65458a; }
+  .pin-loading-bar { width:38%; height:100%; border-radius:999px; background:linear-gradient(90deg,#8b5cf6,#e879f9,#c4b5fd); box-shadow:0 0 12px #a855f7; animation:pinLineMove 1.15s ease-in-out infinite; }
+  .pin-loading-label { margin:10px 0 0; text-align:center; color:#d9c5ff; font-size:11px; font-weight:800; letter-spacing:2px; }
+  #pinVerifyButton:disabled { opacity:.7; cursor:wait; }
+  @keyframes pinLineMove { 0% { transform:translateX(-110%); } 100% { transform:translateX(280%); } }
+  @keyframes pinFadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+  @media (prefers-reduced-motion:reduce) { .pin-loading-bar { animation-duration:2.5s; } .pin-loading.is-visible { animation:none; } }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('pinVerifyForm');
+    if (!form) return;
+    const loading = document.getElementById('pinLoading');
+    const button = document.getElementById('pinVerifyButton');
+    const pin = document.getElementById('securityPinInput');
+    const label = document.getElementById('pinLoadingLabel');
+    const bar = document.getElementById('pinLoadingBar');
+    let busy = false;
+
+    // PIN hanya menerima angka; huruf/simbol dibuang termasuk dari paste.
+    pin.addEventListener('input', function () {
+      const digitsOnly = pin.value.replace(/[^0-9]/g, '');
+      if (pin.value !== digitsOnly) pin.value = digitsOnly;
+    });
+    pin.addEventListener('beforeinput', function (event) {
+      if (event.data && /[^0-9]/.test(event.data) && event.inputType !== 'insertFromPaste') {
+        event.preventDefault();
+      }
+    });
+
+    function showResult(ok, message) {
+      loading.classList.remove('is-success', 'is-error');
+      loading.classList.add(ok ? 'is-success' : 'is-error');
+      label.textContent = message || (ok ? 'PIN BENAR' : 'PIN SALAH');
+      bar.style.animation = 'none';
+      bar.style.transform = 'translateX(0)';
+      bar.style.width = '100%';
+      button.disabled = false;
+      button.textContent = 'VERIFIKASI LAGI';
+      pin.readOnly = false;
+      busy = false;
+    }
+
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      if (busy || !form.reportValidity()) return;
+      busy = true;
+      loading.classList.remove('is-success', 'is-error');
+      loading.classList.add('is-visible');
+      loading.setAttribute('aria-hidden', 'false');
+      label.textContent = 'MEMVERIFIKASI PIN...';
+      bar.style.animation = '';
+      bar.style.transform = '';
+      bar.style.width = '38%';
+      button.disabled = true;
+      button.textContent = 'MEMPROSES...';
+      pin.readOnly = true;
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: new URLSearchParams(new FormData(form)),
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        });
+        let data = {};
+        try { data = await response.json(); } catch (_) {}
+
+        if (response.ok && data.ok && data.redirect) {
+          showResult(true, 'PIN BENAR — AKSES DITERIMA');
+          setTimeout(function () { window.location.href = data.redirect; }, 900);
+          return;
+        }
+        if (response.status === 401 && data.reset) {
+          showResult(false, data.message || 'SESI HABIS — LOGIN ULANG');
+          setTimeout(function () { window.location.href = '/login'; }, 1400);
+          return;
+        }
+        showResult(false, data.message || 'PIN SALAH — COBA LAGI');
+        pin.value = '';
+        pin.focus();
+      } catch (_) {
+        showResult(false, 'KONEKSI GAGAL — COBA LAGI');
+      }
+    });
+  });
+</script>
+
+
+<script>
+(function(){
+  if (!document.getElementById('pall-video-background')) {
+    const video=document.createElement('video'); video.id='pall-video-background'; video.autoplay=true; video.muted=true; video.loop=true; video.playsInline=true; video.setAttribute('aria-hidden','true');
+    const source=document.createElement('source'); source.src='/pall-background.mp4'; source.type='video/mp4'; video.appendChild(source);
+    const overlay=document.createElement('div'); overlay.id='pall-video-overlay'; overlay.setAttribute('aria-hidden','true');
+    document.body.prepend(video); document.body.insertBefore(overlay, video.nextSibling);
+    const play=video.play(); if(play && play.catch) play.catch(()=>{});
+  }
+  // Low-volume background music. Browsers may require the first user interaction before audio can play.
+  if (!document.getElementById('pall-backsound')) {
+    const audio=document.createElement('audio'); audio.id='pall-backsound'; audio.loop=true; audio.preload='auto'; audio.volume=0.10;
+    const audioSource=document.createElement('source'); audioSource.src='/pall-backsound.mp3'; audioSource.type='audio/mpeg'; audio.appendChild(audioSource); document.body.appendChild(audio);
+    const startMusic=()=>{ audio.volume=0.10; const p=audio.play(); if(p && p.then) p.then(()=>{document.removeEventListener('pointerdown',startMusic);document.removeEventListener('keydown',startMusic);}).catch(()=>{}); };
+    startMusic(); document.addEventListener('pointerdown',startMusic); document.addEventListener('keydown',startMusic);
+  }
+  if (!document.getElementById('pall-cursor-glow') && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const cursor=document.createElement('div'); cursor.id='pall-cursor-glow'; cursor.setAttribute('aria-hidden','true'); document.body.appendChild(cursor);
+    let raf=0, x=0, y=0; document.addEventListener('mousemove',function(e){x=e.clientX;y=e.clientY;if(!raf)raf=requestAnimationFrame(function(){cursor.style.left=x+'px';cursor.style.top=y+'px';cursor.style.opacity='1';raf=0;});},{passive:true});
+    document.addEventListener('mouseleave',()=>cursor.style.opacity='0'); document.addEventListener('mouseenter',()=>cursor.style.opacity='1');
+    document.addEventListener('mousedown',()=>cursor.classList.add('is-active')); document.addEventListener('mouseup',()=>cursor.classList.remove('is-active'));
+  }
+})();
+</script>
+
+<script>
+(function(){
+  if (window.__pallPersistentAudioNav) return;
+  window.__pallPersistentAudioNav = true;
+  const persistentIds = ['pall-backsound','pall-video-background','pall-video-overlay','pall-cursor-glow'];
+  function shouldHandle(a, url) {
+    if (!a || !url || url.origin !== location.origin) return false;
+    if (a.target && a.target !== '_self') return false;
+    if (a.hasAttribute('download')) return false;
+    if (url.pathname === '/logout' || url.pathname === '/login' || url.pathname === '/account/password') return false;
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) return false;
+    return ['http:','https:'].includes(url.protocol);
+  }
+  async function navigate(url, push=true) {
+    document.documentElement.classList.add('pall-page-loading');
+    try {
+      const response = await fetch(url.href, { credentials:'same-origin', headers:{'X-PALL-NAV':'1'} });
+      if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) { location.href=url.href; return; }
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const persistent = new Map();
+      for (const id of persistentIds) { const node=document.getElementById(id); if(node) persistent.set(id,node); }
+      const incoming = Array.from(doc.body.childNodes);
+      // PJAX must sync body classes so page-specific styles follow the destination page.
+      document.body.className = doc.body.className;
+      for (const attr of Array.from(document.body.attributes)) { if (attr.name.startsWith("data-")) document.body.removeAttribute(attr.name); }
+      for (const attr of Array.from(doc.body.attributes)) { if (attr.name.startsWith("data-")) document.body.setAttribute(attr.name, attr.value); }
+      document.body.replaceChildren();
+      for (const node of incoming) {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SCRIPT') continue;
+        document.body.appendChild(document.importNode(node, true));
+      }
+      for (const node of persistent.values()) document.body.appendChild(node);
+      // Re-run page scripts so page-specific forms and controls keep working.
+      for (const oldScript of Array.from(doc.body.querySelectorAll('script'))) {
+        const s=document.createElement('script');
+        for (const attr of oldScript.attributes) s.setAttribute(attr.name, attr.value);
+        s.textContent=oldScript.textContent;
+        document.body.appendChild(s);
+      }
+      document.title = doc.title || 'PALL Panel';
+      if (push) history.pushState({pallNav:true}, '', url.href);
+      document.documentElement.classList.remove('pall-page-loading');
+      window.scrollTo(0,0);
+    } catch (e) { document.documentElement.classList.remove('pall-page-loading'); location.href=url.href; }
+  }
+  document.addEventListener('click', function(e){
+    if(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a=e.target.closest('a[href]'); if(!a) return;
+    let url; try { url=new URL(a.href, location.href); } catch(_){ return; }
+    if(!shouldHandle(a,url)) return;
+    e.preventDefault(); if(url.href !== location.href) navigate(url,true);
+  });
+  window.addEventListener('popstate', function(){ navigate(new URL(location.href),false); });
+})();
+</script>
+
+<script src="/pall-enhancements.js" defer></script>
+</body>
+</html>
+<style>
+  .pin-loading.is-success { border-color:#22c55e; background:#0d2119; box-shadow:0 0 18px rgba(34,197,94,.14); }
+  .pin-loading.is-error { border-color:#ef4444; background:#261016; box-shadow:0 0 18px rgba(239,68,68,.14); }
+  .pin-loading.is-success .pin-loading-track { background:#123c29; box-shadow:inset 0 0 0 1px #22c55e; }
+  .pin-loading.is-success .pin-loading-bar { background:linear-gradient(90deg,#16a34a,#4ade80,#bbf7d0); box-shadow:0 0 12px rgba(74,222,128,.75); }
+  .pin-loading.is-success .pin-loading-label { color:#86efac; }
+  .pin-loading.is-error .pin-loading-track { background:#471923; box-shadow:inset 0 0 0 1px #ef4444; }
+  .pin-loading.is-error .pin-loading-bar { background:linear-gradient(90deg,#dc2626,#fb7185,#fecaca); box-shadow:0 0 12px rgba(248,113,113,.75); }
+  .pin-loading.is-error .pin-loading-label { color:#fda4af; }
+</style>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Lisensi</title><link rel="stylesheet" href="/style.css">
+<link rel="icon" type="image/png" href="/logo.png"></head>
+<body class="pall-standard-page">
+<%- include('_sidebar') %>
+<div class="pall-standard-content">
+<div class="topbar">
+  <h1 class="brand-title"><img class="brand-logo" src="/logo.png" alt="PALL logo">LICENSE MANAGER</h1>
+  <nav>
+    <a href="/">DASHBOARD</a>
+    <% if (typeof admin !== 'undefined' && admin.role === 'owner') { %><a href="/admins">AKUN ADMIN</a><% } %>
+    <a href="/accounts">AKUN USER</a>
+    <a href="/devices">PERANGKAT</a>
+    <a href="/audit">AUDIT</a>
+    <% if (typeof admin !== 'undefined' && admin.role === 'owner') { %><a href="/security">KEAMANAN</a><a href="/settings">SETELAN</a><% } %>
+    <a href="/logout" class="btn danger" style="padding: 8px 16px;">LOGOUT</a>
+  </nav>
+</div>
+
+<% if (err) { %><div class="err" role="alert"><%= err %></div><% } %>
+<% if (pesan) { %><div class="ok" role="status"><%= pesan %></div><% } %>
+<div class="panel" style="border:1px solid rgba(167,139,250,.38);background:linear-gradient(135deg,rgba(124,58,237,.16),rgba(15,12,25,.94));display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+  <div><div style="font-size:12px;letter-spacing:.12em;opacity:.75;font-weight:800;">ADMIN BALANCE</div><div style="font-size:30px;font-weight:900;margin-top:6px;"><%= Number(balance || 0).toLocaleString('id-ID') %> <span style="font-size:14px;color:#bba0ff;">KREDIT</span></div><div style="opacity:.72;font-size:13px;margin-top:4px;">Pembuatan dan perpanjangan lisensi admin memotong saldo otomatis.</div></div>
+  <% if (admin.role !== 'owner') { %><div style="padding:10px 14px;border:1px solid rgba(167,139,250,.35);border-radius:12px;font-size:13px;">Hubungi Owner untuk top up saldo.</div><% } else { %><div style="padding:10px 14px;border:1px solid rgba(167,139,250,.35);border-radius:12px;font-size:13px;">Owner bebas menerbitkan lisensi.</div><% } %>
+</div>
+<% if (admin.role === 'owner') { %>
+<div class="panel" style="border:1px solid rgba(167,139,250,.28);">
+  <h2 class="license-heading">Harga Lisensi (Kredit)</h2>
+  <p style="opacity:.75;font-size:13px;">Hanya Owner yang bisa mengatur biaya. Lisensi custom dihitung per blok 30 hari.</p>
+  <form method="POST" action="/licenses/prices" class="row" style="align-items:end;">
+    <% const priceFields = [{key:'4jam',label:'4 Jam'},{key:'7',label:'7 Hari'},{key:'30',label:'30 Hari'},{key:'90',label:'90 Hari'},{key:'365',label:'1 Tahun'},{key:'lifetime',label:'Lifetime'},{key:'custom_month',label:'Custom / 30 Hari'}]; %>
+    <% priceFields.forEach(f => { %><label style="display:flex;flex-direction:column;gap:6px;min-width:110px;flex:1;font-size:12px;opacity:.9;"><%= f.label %><input type="number" name="price_<%= f.key %>" min="0" max="1000000000" step="1" required value="<%= prices[f.key] ?? 0 %>"></label><% }) %>
+    <button type="submit">SIMPAN HARGA</button>
+  </form>
+</div>
+<% } %>
+<div class="panel license-panel license-panel-primary">
+  <h2 class="license-heading">Terbitkan Lisensi Baru</h2>
+  <form method="POST" action="/licenses/issue" class="row">
+    <select name="user_id" required style="flex: 1; min-width: 150px;"><option value="">Pilih User</option><% users.forEach(u => { %><option value="<%= u.id %>"><%= u.username %></option><% }) %></select>
+    <select name="duration" id="duration-issue" required style="flex: 1; min-width: 150px;" onchange="toggleCustom('issue', this.value)">
+      <option value="4jam">4 Jam — <%= prices['4jam'] %> kredit</option><option value="7">7 Hari — <%= prices['7'] %> kredit</option><option value="30">30 Hari — <%= prices['30'] %> kredit</option><option value="90">90 Hari — <%= prices['90'] %> kredit</option><option value="365">1 Tahun — <%= prices['365'] %> kredit</option><option value="lifetime">Lifetime — <%= prices['lifetime'] %> kredit</option><option value="custom">Custom (biaya per 30 hari: <%= prices['custom_month'] %> kredit)</option>
+    </select>
+    <input name="custom_days" id="custom-issue" type="number" placeholder="Hari (jika custom)" style="width:150px; display:none;">
+    <button class="license-action">ISSUE</button>
+  </form>
+</div>
+
+<div class="panel license-panel license-panel-secondary">
+  <h2 class="license-heading">Perpanjang / Update Lisensi</h2>
+  <form method="POST" action="/licenses/update" class="row">
+    <select name="user_id" required style="flex: 1; min-width: 150px;"><option value="">Pilih User</option><% users.forEach(u => { %><option value="<%= u.id %>"><%= u.username %></option><% }) %></select>
+    <select name="action" required style="flex: 1; min-width: 150px;"><option value="renew">Perpanjang</option><option value="suspend">Suspend</option><option value="revoke">Revoke</option></select>
+    <select name="duration" id="duration-update" style="flex: 1; min-width: 150px;" onchange="toggleCustom('update', this.value)">
+      <option value="4jam">4 Jam — <%= prices['4jam'] %> kredit</option><option value="7">7 Hari — <%= prices['7'] %> kredit</option><option value="30">30 Hari — <%= prices['30'] %> kredit</option><option value="90">90 Hari — <%= prices['90'] %> kredit</option><option value="365">1 Tahun — <%= prices['365'] %> kredit</option><option value="lifetime">Lifetime — <%= prices['lifetime'] %> kredit</option><option value="custom">Custom (biaya per 30 hari: <%= prices['custom_month'] %> kredit)</option>
+    </select>
+    <input name="custom_days" id="custom-update" type="number" placeholder="Hari (jika custom)" style="width:150px; display:none;">
+    <button class="license-action">UPDATE</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>Riwayat Balance</h2>
+  <p style="opacity:.72;font-size:13px;">15 transaksi terbaru. Semua perubahan saldo tercatat otomatis.</p>
+  <div style="overflow-x:auto;">
+  <table>
+    <tr><th>Waktu (WIB)</th><th>Admin</th><th>Jenis</th><th>Perubahan</th><th>Saldo Akhir</th><th>Catatan</th></tr>
+    <% transactions.forEach(t => { %>
+    <tr>
+      <td><%= new Date(t.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) %></td>
+      <td><%= t.admin_username %></td>
+      <td><%= ({topup:'TOP UP',license_issue:'BUAT LISENSI',license_renewal:'PERPANJANGAN',adjustment:'PENYESUAIAN'})[t.transaction_type] || t.transaction_type %></td>
+      <td style="font-weight:800;color:<%= Number(t.amount) > 0 ? '#53ddb0' : '#ff9caa' %>;"><%= Number(t.amount) > 0 ? '+' : '' %><%= Number(t.amount).toLocaleString('id-ID') %></td>
+      <td><%= Number(t.balance_after).toLocaleString('id-ID') %></td>
+      <td><%= t.note || '-' %></td>
+    </tr>
+    <% }) %>
+    <% if (!transactions.length) { %><tr><td colspan="6" style="text-align:center;opacity:.7;">Belum ada transaksi balance.</td></tr><% } %>
+  </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Daftar Lisensi</h2>
+  <table>
+    <tr><th>ID</th><th>User</th><th>Key</th><th>Tipe</th><th>Status</th><th>Expires (WIB)</th></tr>
+    <% licenses.forEach(l => { %>
+    <tr>
+      <td><%= l.id %></td><td style="font-weight: 800;"><%= l.username %></td>
+      <td>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="license-key" style="font-family:monospace; font-weight: 800; padding: 4px;"><%= l.key %></span>
+          <button type="button" onclick="copyText('<%= l.key %>')" style="padding: 4px 8px; border-width: 2px; font-size: 12px;">COPY</button>
+        </div>
+      </td>
+      <td><% if (l.lifetime) { %>Lifetime<% } else if (l.duration_days === 0 || l.duration_days === null) { %>Free Trial (4 Jam)<% } else { %><%= l.duration_days %> Hari<% } %></td>
+      <td><span class="<%= l.status === 'active' ? 'status-active' : 'status-inactive' %>"><%= l.status.toUpperCase() %></span></td>
+      <td><%= l.expires_at ? new Date(l.expires_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-' %></td>
+    </tr>
+    <% }) %>
+  </table>
+
+  <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center; align-items: center;">
+    <% if (currentPage > 1) { %>
+      <a href="/licenses?page=<%= currentPage - 1 %>" class="btn" style="padding: 8px 16px;">&laquo; PREV</a>
+    <% } %>
+    <span class="page-indicator" style="font-weight: bold;">Halaman <%= currentPage %> / <%= totalPages %></span>
+    <% if (currentPage < totalPages) { %>
+      <a href="/licenses?page=<%= currentPage + 1 %>" class="btn" style="padding: 8px 16px;">NEXT &raquo;</a>
+    <% } %>
+  </div>
+</div>
+
+<script>
+  function toggleCustom(formType, value) {
+    const inputElement = document.getElementById('custom-' + formType);
+    if (value === 'custom') { inputElement.style.display = 'inline-block'; inputElement.required = true; }
+    else { inputElement.style.display = 'none'; inputElement.required = false; inputElement.value = ''; }
+  }
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Key Lisensi berhasil disalin!');
+    }).catch(err => {
+      alert('Gagal menyalin: ' + err);
+    });
+  }
+
+  const toggleBtn = document.getElementById('theme-toggle');
+  if (localStorage.getItem('theme') === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); if (toggleBtn) toggleBtn.innerText = '☀️ LIGHT'; }
+  if (toggleBtn) toggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (document.documentElement.getAttribute('data-theme') === 'dark') { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('theme', 'light'); toggleBtn.innerText = '🌙 DARK'; }
+    else { document.documentElement.setAttribute('data-theme', 'dark'); localStorage.setItem('theme', 'dark'); toggleBtn.innerText = '☀️ LIGHT'; }
+  });
+</script>
+
+<script>
+(function(){
+  if (!document.getElementById('pall-video-background')) {
+    const video=document.createElement('video'); video.id='pall-video-background'; video.autoplay=true; video.muted=true; video.loop=true; video.playsInline=true; video.setAttribute('aria-hidden','true');
+    const source=document.createElement('source'); source.src='/pall-background.mp4'; source.type='video/mp4'; video.appendChild(source);
+    const overlay=document.createElement('div'); overlay.id='pall-video-overlay'; overlay.setAttribute('aria-hidden','true');
+    document.body.prepend(video); document.body.insertBefore(overlay, video.nextSibling);
+    const play=video.play(); if(play && play.catch) play.catch(()=>{});
+  }
+  // Low-volume background music. Browsers may require the first user interaction before audio can play.
+  if (!document.getElementById('pall-backsound')) {
+    const audio=document.createElement('audio'); audio.id='pall-backsound'; audio.loop=true; audio.preload='auto'; audio.volume=0.10;
+    const audioSource=document.createElement('source'); audioSource.src='/pall-backsound.mp3'; audioSource.type='audio/mpeg'; audio.appendChild(audioSource); document.body.appendChild(audio);
+    const startMusic=()=>{ audio.volume=0.10; const p=audio.play(); if(p && p.then) p.then(()=>{document.removeEventListener('pointerdown',startMusic);document.removeEventListener('keydown',startMusic);}).catch(()=>{}); };
+    startMusic(); document.addEventListener('pointerdown',startMusic); document.addEventListener('keydown',startMusic);
+  }
+  if (!document.getElementById('pall-cursor-glow') && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const cursor=document.createElement('div'); cursor.id='pall-cursor-glow'; cursor.setAttribute('aria-hidden','true'); document.body.appendChild(cursor);
+    let raf=0, x=0, y=0; document.addEventListener('mousemove',function(e){x=e.clientX;y=e.clientY;if(!raf)raf=requestAnimationFrame(function(){cursor.style.left=x+'px';cursor.style.top=y+'px';cursor.style.opacity='1';raf=0;});},{passive:true});
+    document.addEventListener('mouseleave',()=>cursor.style.opacity='0'); document.addEventListener('mouseenter',()=>cursor.style.opacity='1');
+    document.addEventListener('mousedown',()=>cursor.classList.add('is-active')); document.addEventListener('mouseup',()=>cursor.classList.remove('is-active'));
+  }
+})();
+</script>
+
+<script>
+(function(){
+  if (window.__pallPersistentAudioNav) return;
+  window.__pallPersistentAudioNav = true;
+  const persistentIds = ['pall-backsound','pall-video-background','pall-video-overlay','pall-cursor-glow'];
+  function shouldHandle(a, url) {
+    if (!a || !url || url.origin !== location.origin) return false;
+    if (a.target && a.target !== '_self') return false;
+    if (a.hasAttribute('download')) return false;
+    if (url.pathname === '/logout' || url.pathname === '/login' || url.pathname === '/account/password') return false;
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) return false;
+    return ['http:','https:'].includes(url.protocol);
+  }
+  async function navigate(url, push=true) {
+    document.documentElement.classList.add('pall-page-loading');
+    try {
+      const response = await fetch(url.href, { credentials:'same-origin', headers:{'X-PALL-NAV':'1'} });
+      if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) { location.href=url.href; return; }
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const persistent = new Map();
+      for (const id of persistentIds) { const node=document.getElementById(id); if(node) persistent.set(id,node); }
+      const incoming = Array.from(doc.body.childNodes);
+      // PJAX must sync body classes so page-specific styles follow the destination page.
+      document.body.className = doc.body.className;
+      for (const attr of Array.from(document.body.attributes)) { if (attr.name.startsWith("data-")) document.body.removeAttribute(attr.name); }
+      for (const attr of Array.from(doc.body.attributes)) { if (attr.name.startsWith("data-")) document.body.setAttribute(attr.name, attr.value); }
+      document.body.replaceChildren();
+      for (const node of incoming) {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SCRIPT') continue;
+        document.body.appendChild(document.importNode(node, true));
+      }
+      for (const node of persistent.values()) document.body.appendChild(node);
+      // Re-run page scripts so page-specific forms and controls keep working.
+      for (const oldScript of Array.from(doc.body.querySelectorAll('script'))) {
+        const s=document.createElement('script');
+        for (const attr of oldScript.attributes) s.setAttribute(attr.name, attr.value);
+        s.textContent=oldScript.textContent;
+        document.body.appendChild(s);
+      }
+      document.title = doc.title || 'PALL Panel';
+      if (push) history.pushState({pallNav:true}, '', url.href);
+      document.documentElement.classList.remove('pall-page-loading');
+      window.scrollTo(0,0);
+    } catch (e) { document.documentElement.classList.remove('pall-page-loading'); location.href=url.href; }
+  }
+  document.addEventListener('click', function(e){
+    if(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a=e.target.closest('a[href]'); if(!a) return;
+    let url; try { url=new URL(a.href, location.href); } catch(_){ return; }
+    if(!shouldHandle(a,url)) return;
+    e.preventDefault(); if(url.href !== location.href) navigate(url,true);
+  });
+  window.addEventListener('popstate', function(){ navigate(new URL(location.href),false); });
+})();
+</script>
+
+<script src="/pall-enhancements.js" defer></script>
+</div>
+</body>
+</html>

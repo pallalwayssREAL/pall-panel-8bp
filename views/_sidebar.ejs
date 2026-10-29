@@ -1,0 +1,16 @@
+<aside class="pall-global-sidebar" aria-label="Navigasi utama">
+  <a class="pall-global-brand" href="/"><img src="/logo.png" alt="PALL logo"><span>PALL 8BP<small>PREMIUM CONTROL</small></span></a>
+  <div class="pall-global-label">MAIN MENU</div>
+  <nav class="pall-global-nav">
+    <a href="/"><span>▦</span>Dashboard</a>
+    <% if (typeof admin !== 'undefined' && admin && admin.role === 'owner') { %><a href="/admins"><span>♧</span>Akun Admin</a><% } %>
+    <a href="/accounts"><span>♙</span>Akun User</a>
+    <a href="/licenses"><span>◈</span>Lisensi</a>
+    <a href="/devices"><span>▣</span>Perangkat</a>
+    <a href="/audit"><span>⌁</span>Activity</a>
+    <% if (typeof admin !== 'undefined' && admin && admin.role === 'owner') { %><a href="/settings"><span>⚙</span>Setelan</a><% } %>
+    <a href="/profile"><span>◎</span>Profil</a>
+  </nav>
+  <div class="pall-global-bottom"><span><i></i> System Online</span><a href="/logout">⇥ &nbsp; Log Out</a></div>
+</aside>
+<script>(function(){var p=location.pathname.replace(/\/$/,'')||'/';document.querySelectorAll('.pall-global-nav a').forEach(function(a){var h=a.getAttribute('href');if(h===p||(h!=='/'&&p.startsWith(h+'/')))a.classList.add('is-current')})})();</script>
