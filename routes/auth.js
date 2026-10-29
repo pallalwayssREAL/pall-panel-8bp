@@ -1,5 +1,5 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { audit } = require('../lib/audit');
 const { revokeAdminSessions } = require('../lib/sessions');
@@ -8,13 +8,19 @@ const router = express.Router();
 const MAX_ATTEMPTS = 5;
 
 async function tooManyAttempts(username, ip) {
+  // Counter per-username dan per-IP dipisah supaya user warnet/kantor (IP sama)
+  // tidak saling memblokir. IP diberi batas lebih longgar.
   const r = await pool.query(
-    `SELECT COUNT(*) FROM login_attempts
+    `SELECT
+       COUNT(*) FILTER (WHERE username=$1)::int AS by_user,
+       COUNT(*) FILTER (WHERE ip=$2)::int AS by_ip
+     FROM login_attempts
      WHERE success=false AND (username=$1 OR ip=$2)
        AND created_at > NOW() - interval '15 minutes'`,
     [username, ip]
   );
-  return parseInt(r.rows[0].count) >= MAX_ATTEMPTS;
+  const row = r.rows[0];
+  return row.by_user >= MAX_ATTEMPTS || row.by_ip >= MAX_ATTEMPTS * 4;
 }
 
 router.get('/login', (req, res) => {
@@ -79,7 +85,9 @@ router.post('/login', async (req, res) => {
         }
       }
 
-      await pool.query('INSERT INTO login_attempts (username, success, ip) VALUES ($1,$2,$3)', [username || null, !!pinOk, ip]);
+      try {
+        await pool.query('INSERT INTO login_attempts (username, success, ip) VALUES ($1,$2,$3)', [username || null, !!pinOk, ip]);
+      } catch (e) { console.error('login_attempts write failed:', e.message); }
       if (!pinOk) {
         if (wantsJson) return res.status(401).json({ ok: false, message: 'PIN salah. Periksa kembali PIN lu.' });
         return res.status(401).render('login', { error: 'PIN salah!', show_pin: true, username });
@@ -110,7 +118,9 @@ router.post('/login', async (req, res) => {
     const r = await pool.query('SELECT * FROM admins WHERE username=$1 AND active=true', [username]);
     const admin = r.rows[0];
     const ok = !!(admin && password && await bcrypt.compare(password, admin.password_hash));
-    await pool.query('INSERT INTO login_attempts (username, success, ip) VALUES ($1,$2,$3)', [username || null, !!ok, ip]);
+    try {
+      await pool.query('INSERT INTO login_attempts (username, success, ip) VALUES ($1,$2,$3)', [username || null, !!ok, ip]);
+    } catch (e) { console.error('login_attempts write failed:', e.message); }
 
     if (!ok) {
       req.session.pendingAdminId = null;
